@@ -5,6 +5,7 @@ import axios from "axios";
 const App = () => {
   const [policy, setPolicy] = useState("");
   const [analysis, setAnalysis] = useState("");
+  const [score, setScore] = useState(null); // State to store the score
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
@@ -26,12 +27,41 @@ const App = () => {
     }
   }, []);
 
+  const calculateScore = (text) => {
+    let score = 100;
+  
+    // Deduct points for negative aspects
+    if (text.toLowerCase().includes("third-party sharing")) score -= 15;
+    if (text.toLowerCase().includes("biometric data")) score -= 10;
+    if (text.toLowerCase().includes("long-term retention")) score -= 10;
+    if (text.toLowerCase().includes("no opt-out")) score -= 5;
+    if (text.toLowerCase().includes("tracking")) score -= 20;
+    if (text.toLowerCase().includes("advertisers")) score -= 10;
+  
+    // Add points for positive aspects
+    if (text.toLowerCase().includes("encryption")) score += 5;
+    if (text.toLowerCase().includes("data protection officer")) score += 5;
+    if (text.toLowerCase().includes("annual audits")) score += 5;
+    if (text.toLowerCase().includes("secure storage")) score += 5;
+  
+    // Ensure score does not exceed 100
+    if (score > 100) score = 100;
+  
+    // Ensure score does not fall below 0
+    if (score < 0) score = 0;
+  
+    return score;
+  };
+
+  const getColorForScore = (score) => {
+    if (score >= 75) return "#d4edda"; // Green
+    else if (score >= 50) return "#fff3cd"; // Yellow
+    else return "#f8d7da"; // Red
+  };
+
   const analyzePolicy = async () => {
     setLoading(true);
     try {
-      // Log the API key (remove this in production!)
-      console.log("API Key available:", !!process.env.REACT_APP_OPENAI_API_KEY);
-
       const response = await axios.post(
         "https://api.openai.com/v1/chat/completions",
         {
@@ -56,16 +86,13 @@ const App = () => {
         }
       );
 
-      console.log("API Response:", response.data);
-      setAnalysis(response.data.choices[0].message.content);
+      const analyzedText = response.data.choices[0].message.content;
+      setAnalysis(analyzedText);
+      const calculatedScore = calculateScore(analyzedText);
+      setScore(calculatedScore);
     } catch (error) {
-      console.error("Full error:", error);
-      console.error("Error response:", error.response?.data);
-      setAnalysis(
-        `Error analyzing policy: ${
-          error.response?.data?.error?.message || error.message
-        }`
-      );
+      console.error("Error analyzing policy:", error);
+      setAnalysis(`Error analyzing policy: ${error.message}`);
     }
     setLoading(false);
   };
@@ -99,12 +126,17 @@ const App = () => {
           <h2>Analysis:</h2>
           <div
             style={{
-              backgroundColor: "#f8f9fa",
+              backgroundColor: getColorForScore(score),
               padding: "15px",
               borderRadius: "4px",
             }}
           >
             <p style={{ whiteSpace: "pre-wrap" }}>{analysis}</p>
+            {score !== null && (
+              <p style={{ fontWeight: 'bold', marginTop: '10px' }}>
+                Score: {score}/100 - Risk Level: {score >= 75 ? "Low" : score >= 50 ? "Moderate" : "High"}
+              </p>
+            )}
           </div>
         </div>
       )}
